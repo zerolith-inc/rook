@@ -1,8 +1,20 @@
 # Rook
 
-**a team of agents, built on DSH**
+**a team of agents**
 
-An early development workspace for Rook. The scaffold includes an Expo Web app,
+Rook is an open-source product for working with a team of agents that retain
+context, share knowledge within explicit boundaries, and keep working on a
+persistent computer. Its intended experience combines agent collaboration with
+memory users can inspect and correct, and turns useful experience into reusable
+skills and documents. DSH is the runtime underneath that experience, not the
+product's core promise.
+
+Start with the [product overview](docs/product.md) and
+[architecture](docs/architecture.md).
+
+## Current status
+
+Rook is in early development. The scaffold includes an Expo Web app,
 a Bun/Hono API, shared Effect schemas, and a local Oxigraph service.
 The agent runtime is not connected yet; the status screen reports this explicitly.
 
@@ -69,8 +81,8 @@ packages/dsh-adapter   DSH integration placeholder
 presets                Future agent presets
 ```
 
-See [the bootstrap decision](docs/decisions/0001-bootstrap.md) for the current
-boundaries, upstream references, and next integration steps.
+See [Architecture](docs/architecture.md) for the current implementation,
+planned system, and integration work.
 
 ## Third-party code
 
