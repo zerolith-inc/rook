@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --watch src/index.ts",
-    "start": "bun dist/index.js",
-    "build": "bun build src/index.ts --target=bun --outdir=dist",
+    "dev": "node --watch src/index.ts",
+    "start": "node src/index.ts",
+    "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.1",
     "@rook/contracts": "workspace:*",
     "@rook/dsh-adapter": "workspace:*",
     "effect": "3.22.2",

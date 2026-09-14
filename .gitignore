@@ -4,6 +4,10 @@ dist/
 .vite/
 .vite-plus/
 .vp/
+.vite-hooks/_
+.direnv/
+result
+result-*
 coverage/
 .env
 .env.*

@@ -2,10 +2,12 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    "verbatimModuleSyntax": true,
+    "noUncheckedIndexedAccess": true,
     "paths": {
       "@/*": ["./*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", "nativewind-env.d.ts"],
+  "include": ["**/*.ts", "**/*.tsx", "uniwind-types.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

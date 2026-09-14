@@ -1,84 +1,67 @@
 # Architecture
 
-Rook uses DSH for agent execution and adds shared memory, agent identity and
-communication, and the product interface. See [Product](product.md) for the
-intended user experience and the [README](../README.md) for setup.
+Rook uses DSH for agent execution and adds shared memory, agent identity and communication, and the product interface. See [Product](product.md) for the intended user experience and the [README](../README.md) for setup.
 
-The runtime, memory, and collaboration sections describe the planned system.
-Only the Web app scaffold, health API, shared contracts, and local Oxigraph
-service exist today; see [Current implementation](#current-implementation).
+The runtime, memory, and collaboration sections describe the planned system. Only the Web app scaffold, health API, shared contracts, and local Oxigraph service exist today; see [Current implementation](#current-implementation).
 
 ## Current implementation
 
-Use Bun workspaces with `apps/app` for Expo Web and `apps/api` for the persistent
-Bun server. Vite+ handles lint, format, and common tasks. Metro remains the app
-bundler. Shared API schemas live in `packages/contracts` and are validated on
-both sides of the connection.
+Use Bun workspaces with `apps/app` for Expo Web and `apps/api` for the persistent Node server. Bun is the package manager only. Node runs Expo/Metro and the API. Ultracite owns lint and format. Vite+ runs workspace tasks and git hooks. Metro remains the app bundler. Shared API schemas live in `packages/contracts` and are validated on both sides of the connection. A Nix flake provides the local toolchain.
 
-The UI uses React Native Reusables with NativeWind 4 and Tailwind 3, based on the
-upstream minimal template at commit `ecdc14b50fa9ad4d905085dc394cf783d48ad66d`.
-Expo 56 is the upstream template baseline; Expo's compatibility check determines
-the React Native dependency versions. Dependencies are resolved in `bun.lock`.
+The UI uses React Native Reusables with Uniwind and Tailwind 4, following the [installation](https://reactnativereusables.com/docs/installation) Uniwind path and the upstream `minimal-uniwind` template at commit `ecdc14b50fa9ad4d905085dc394cf783d48ad66d`. Copied components follow that template; the app SDK is Expo 57 (React Native 0.86). Expo's `expo install --fix` determines React Native and Expo module versions. Dependencies are resolved in `bun.lock`.
 
-The API provides liveness only. A successful `/health` response means the HTTP
-process works, not that an agent or memory integration is ready. The shared
-contract explicitly reports the unconfigured runtime. Expected browser origins
-are configured for local development; CORS is not an authentication mechanism.
+The API runs TypeScript through Node's type stripping (`noEmit`). Workspace packages export `.ts` sources, so there is no API `dist`. That matches [Node's TypeScript guidance](https://nodejs.org/api/typescript.html) for executing `*.ts` files. The official Hono Node starter uses `tsx` plus `tsc` emit; this repo skips both because Node 24 already runs the workspace graph.
 
-Oxigraph runs locally with a persistent Docker volume. It is not yet accessed by
-the API. There is no additional database. No graph ontology, user/account system,
-agent orchestration, event stream, or production deployment is implemented here.
+The API provides liveness only. A successful `/health` response means the HTTP process works, not that an agent or memory integration is ready. The shared contract explicitly reports the unconfigured runtime. Expected browser origins are configured for local development; CORS is not an authentication mechanism.
+
+Oxigraph runs locally with either the Nix package or a persistent Docker volume. It is not yet accessed by the API. There is no additional database. No graph ontology, user/account system, agent orchestration, event stream, or production deployment is implemented here.
 
 ### Integration work
 
-Before connecting DSH, verify its upstream package, supported headless API, Bun
-compatibility, session/workflow persistence, and restart recovery. Keep agent
-loops, tools, skills, subagents, and workflows owned by DSH. The adapter package
-currently reports only `not-configured`; it does not simulate agents.
+Before connecting DSH, verify its upstream package, supported headless API, Node compatibility, session/workflow persistence, and restart recovery. Keep agent loops, tools, skills, subagents, and workflows owned by DSH. The adapter package currently reports only `not-configured`; it does not simulate agents.
 
-Connect memory through Oxigraph once the minimal ontology and provenance contract
-are defined. Add HTTP/SSE behavior when the real runtime event contract is known.
-Native mobile and desktop packaging are outside this initial Web scaffold.
+Connect memory through Oxigraph once the minimal ontology and provenance contract are defined. Add HTTP/SSE behavior when the real runtime event contract is known. Native mobile and desktop packaging are outside this initial Web scaffold.
 
 ## Implementation references
 
-- [React Native Reusables template](https://github.com/founded-labs/react-native-reusables-templates/tree/ecdc14b50fa9ad4d905085dc394cf783d48ad66d/minimal)
-- [React Native Reusables installation](https://reactnativereusables.com/docs/installation/manual)
-- [NativeWind installation](https://www.nativewind.dev/docs/getting-started/installation)
+- [React Native Reusables Uniwind template](https://github.com/founded-labs/react-native-reusables-templates/tree/ecdc14b50fa9ad4d905085dc394cf783d48ad66d/minimal-uniwind)
+- [React Native Reusables installation](https://reactnativereusables.com/docs/installation)
+- [Uniwind](https://docs.uniwind.dev/quickstart)
+- [Ultracite](https://www.ultracite.ai/docs)
 - [Vite+ workspace task execution](https://viteplus.dev/guide/run)
 - [Oxigraph](https://github.com/oxigraph/oxigraph)
 
 ## Runtime and responsibility boundaries
 
-Rookは、DSHをフォークして新しいAgent Runtimeを作るのではなく、**DSHをheadless agent kernelとして利用し、その上に薄い Gateway / product UX 層を実装する**。
+Rook does not fork DSH to build a new agent runtime. It uses **DSH as a headless agent kernel** and implements a thin Gateway / product UX layer on top.
 
-基本の責務境界は次の通りとする。
+The basic responsibility split is:
 
-| 層               | 責務                                                                                                          |
-| ---------------- | ------------------------------------------------------------------------------------------------------------- |
-| DSH              | Agent loop、model routing、session、tool、Skill、MCP、planning、goal、workflow、DSH subagent等のAgent Runtime |
-| Agent Plugins v1 | 外部能力の追加形式。DSH adapterを介してnativeに読み込む                                                       |
-| Skill            | 知識、手順、振る舞い、再利用可能なprocedure                                                                   |
-| Computer         | Agentが常時使う永続的な実行・操作環境                                                                         |
-| Sandbox          | 危険または一時的な処理だけを逃がす任意の隔離先                                                                |
-| Memory           | Graph / Ontology中心のinspectableな構造化Knowledge                                                            |
-| Subagent         | Main Agent配下の一時的または継続的なchild agent                                                               |
-| Agent Network    | 親子関係を持たない独立Agent間の発見・依頼・通信                                                               |
-| A2A              | Agent Networkが利用するtransportの一つ                                                                        |
-| Gateway / Client | Web、PWA、CLI、通知等の常駐Agent UX                                                                           |
+| Layer | Responsibility |
+| --- | --- |
+| DSH | Agent loop, model routing, session, tool, Skill, MCP, planning, goal, workflow, DSH subagents |
+| Agent Plugins v1 | Extra capability format. Loaded natively through the DSH adapter |
+| Skill | Knowledge, procedures, behavior, reusable procedures |
+| Computer | Persistent execution environment the agent uses continuously |
+| Sandbox | Optional isolation for dangerous or temporary work |
+| Memory | Inspectable structured knowledge, centered on a graph / ontology |
+| Subagent | Temporary or long-lived child agent under a main agent |
+| Agent Network | Discovery, requests, and communication between independent agents with no parent/child relationship |
+| A2A | One transport the Agent Network can use |
+| Gateway / Client | Always-on agent UX: Web, PWA, CLI, notifications |
 
-独自実装の中心は、Memory、Agent identity / Agent Network、Gateway / product UXに絞る。DSHが既に持つloop、tool、skill、subagent、workflow、sandbox等を再実装しない。
+Original work is concentrated on Memory, agent identity / Agent Network, and Gateway / product UX. Do not reimplement loops, tools, skills, subagents, workflows, or sandboxes that DSH already owns.
 
-## Computer-firstの方針
+## Computer-first policy
 
-この用途では、使い捨てjobよりも、ユーザーの環境と状態を保つ**Persistent Computer-first**を優先する。
+For this product, a **persistent computer** beats disposable jobs.
 
-- Computerは現時点では1つに固定する。
-- ローカルの実ユーザーPC、永続VM、永続container等を候補とする。
-- Browser profile、filesystem、Git checkout、build cache、shell環境、インストール済みアプリ、OS・desktop状態を継続利用できることを重視する。
-- 複数ComputerやComputer ProfileをMVPのUXとして作らない。必要性が確認できた場合に拡張する。
-- SandboxはComputerそのものではなく、未知のrepo、怪しいpackage、arbitrary code、依存衝突、大量処理などを一時的に隔離する任意の実行先とする。
-- Sandbox内で毎回DSHを起動する構成にはせず、Agent Runtimeと一時コード実行環境を分離する。
+- There is one Computer at this stage.
+- Candidates include a local user PC, a persistent VM, or a persistent container.
+- Prefer continuity of browser profiles, filesystem, Git checkouts, build caches, shell environment, installed apps, and OS / desktop state.
+- Do not build multi-computer or Computer Profile UX for MVP. Extend only after the need is confirmed.
+- A Sandbox is not the Computer. It is an optional place to isolate unknown repos, untrusted packages, arbitrary code, dependency conflicts, or heavy work.
+- Do not start DSH inside the sandbox on every run. Keep the agent runtime separate from disposable code execution.
 
 ```text
 Persistent Computer
@@ -87,20 +70,20 @@ Persistent Computer
              └─ dangerous / temporary work only
 ```
 
-ComputerをPluginとして抽象化する場合も、初期の実体は一つでよい。将来のprovider差し替えに備えた薄い境界だけを持つ。
+If Computer is abstracted as a plugin, the first implementation can still be a single instance. Keep a thin boundary for a future provider swap.
 
-## Account、Group、Agent、SessionのScope
+## Account, Group, Agent, and Session scope
 
-Computer、Memory、Skillを別々の所有モデルで管理せず、同じScopeモデルに載せる。Scopeは次の4層とする。
+Do not give Computer, Memory, and Skill separate ownership models. Put them on the same four-layer scope:
 
-| Scope   | 主な内容                                                                                                 |
-| ------- | -------------------------------------------------------------------------------------------------------- |
-| Account | ユーザー全体の長期情報、共通Project、人物、preference、Account Skill                                     |
-| Group   | 複数Agentが共同で扱うProject、architecture decision、convention、repo、deployment、incident、Group Skill |
-| Agent   | Agent固有の作業履歴、private memory、private state、Agent Skill                                          |
-| Session | 現在の作業、短期状態、会話・操作のepisode                                                                |
+| Scope | Typical contents |
+| --- | --- |
+| Account | Long-lived user information, shared projects, people, preferences, Account skills |
+| Group | Shared project context, architecture decisions, conventions, repos, deployments, incidents, Group skills |
+| Agent | Agent-specific history, private memory, private state, Agent skills |
+| Session | Current work, short-lived state, a conversation or operation episode |
 
-**Groupは単なるBot一覧ではなく、Agentたちが共同所有する共有コンテキスト境界**とする。Memory、Skill、必要に応じてComputer利用権限やsecret scopeをGroupに結び付けられるようにする。
+**A Group is not a bot list.** It is a shared context boundary that agents co-own. Memory, skills, and when needed computer access or secret scope can attach to a Group.
 
 ```text
 Account
@@ -118,23 +101,23 @@ Account
    └─ Session working context
 ```
 
-知識を保存する前に、private Agent、Group、Accountのどこへ還元するかを分類する。例えば、repo固有のcoding conventionはGroup、個別Issueの進捗はAgent、ユーザーの出力形式の好みはAccountに置く。
+Before saving knowledge, decide whether it belongs on a private Agent, a Group, or the Account. Repo-specific coding conventions go on the Group. Progress on a single issue stays on the Agent. Output-format preferences belong on the Account.
 
 ## Memory
 
-Memoryは、ユーザーとAgentが知識・根拠・訂正の影響を確認できるGraph / Ontology中心のKnowledge Layerとする。
+Memory is a graph / ontology knowledge layer that users and agents can inspect for knowledge, evidence, and the effect of corrections.
 
-### 知識単位
+### Units of knowledge
 
-Memoryは、出典・有効期間・確定状態を持つClaimと、根拠となるEpisodeへの遡及を組み合わせる。Entityは「何について」、Claimは「何が言われているか」、Episodeは「どの出来事で得たか」を表す。Decision、Preference、Stateは初期にはClaimの種別として扱う。
+Memory combines Claims that have sources, validity windows, and confirmation state with Episodes that can be traced as evidence. An Entity is "what this is about", a Claim is "what is being said", and an Episode is "which event produced it". Decision, Preference, and State start as kinds of Claim.
 
-例えば「RookはOxigraphを使う」というClaimには、適用Scope、決定の根拠となるメッセージへの出典、取得したAgentとSession、有効期間、記録日時、確定状態、置き換える旧Claimを関連付ける。ユーザーが採用技術を変更した場合、現在の決定を更新しつつ過去の決定と根拠を辿れるようにする。
+For example, the claim "Rook uses Oxigraph" should carry its scope, a pointer to the source message, the agent and session that captured it, a validity window, recorded time, confirmation state, and the claim it replaces. If the user changes the store, the current decision updates while the old decision and its evidence stay reachable.
 
-ユーザーは、何を覚えているか、なぜそう判断したか、訂正によって何が変わるかを確認できる。出来事・知識の有効期間と、システムが記録した時刻は区別する。
+Users should be able to see what is remembered, why, and what a correction changes. The validity window of an event or fact is distinct from the time the system recorded it.
 
-### 原文と出典
+### Source text
 
-会話全文はGraphに直接保存せず、DSHの保存先またはファイルに保持する。Graphには意味のあるEpisodeとClaimを保存し、元のSessionやMessage範囲への出典を持たせる。複数Agentが知識を統合しても、取得元のAgent、Session、原文を辿れるようにする。
+Do not store full conversations in the graph. Keep raw text in DSH storage or files. The graph holds meaningful Episodes and Claims, with pointers back to the original session or message range. When several agents contribute, the originating agent, session, and source text remain traceable.
 
 ```text
 Conversation / Action
@@ -142,49 +125,49 @@ Conversation / Action
 Raw source → Episode → Claim → Oxigraph Knowledge Graph
 ```
 
-### 書き込みと共有知識への確定
+### Writes and confirming shared knowledge
 
-観測の保存と知識としての確定を分ける。原文とEpisodeを根拠としてClaim候補を抽出し、既存Claimと照合したうえで、情報源の権限と根拠に応じて確定するか、候補・競合として保持する。
+Separate observation from confirmation. Extract candidate Claims from source text and Episodes, compare them with existing Claims, then confirm them or keep them as candidates / conflicts according to source authority and evidence.
 
-- 自動保存は許可されたScope内で広く認める。
-- 明示的な決定や観測結果は、根拠と権限に応じて許可された範囲で自動反映する。
-- 推測、未解決の競合、共有範囲の拡大は候補に留める。
-- 発言が新しいという理由だけでは、既存の確定した決定を上書きしない。
-- Agentの提案は、ユーザーが承認した決定を失効させない。正当な変更決定では、旧Claimの履歴と置換関係を残す。
-- 同じ出典を複数Agentが引用しても、独立した裏付けとして数えない。
+- Auto-save widely inside permitted scopes.
+- Explicit decisions and observations can land automatically when evidence and authority allow.
+- Speculation, unresolved conflicts, and expansions of share scope stay candidates.
+- Novelty alone does not overwrite a confirmed decision.
+- An agent's suggestion does not retire a user-approved decision. A legitimate change keeps history and the replacement relation.
+- Several agents citing the same source do not count as independent corroboration.
 
-### 読み出し
+### Reads
 
-読み出しは、少量の常時コンテキスト、必要時の検索、根拠への遡及を組み合わせる。常時コンテキストには関連するユーザー設定、Groupの重要な決定、現在の作業概要を含める。検索では許可されたScope内の語句・意味・Entityの関係を利用し、必要に応じてEpisodeや原文へ戻る。
+Reads combine a small always-on context, search when needed, and tracing back to evidence. Always-on context includes relevant user settings, important Group decisions, and a summary of current work. Search uses terms, meaning, and entity relations inside the allowed scope, returning to Episodes or source text as needed.
 
-Graphを正本とし、検索用索引や要約は再生成可能な派生データとして扱う。検索結果には出典、有効期間、競合の有無を含める。Scope制約は検索、関係の探索、要約にも適用する。
+The graph is the source of truth. Search indexes and summaries are regenerable derived data. Results include source, validity window, and whether a conflict exists. Scope limits apply to search, graph walk, and summaries.
 
-Episode検索だけでは現在の決定を毎回読み解く必要があり、Claim検索だけでは抽出時に文脈を失う可能性がある。このため、明示的なClaimと原文への遡及を組み合わせる方式を採用する。
+Episode search alone would force rereading current decisions every time. Claim search alone can lose context at extraction time. Use explicit Claims plus a path back to the source.
 
-### 成立条件
+### Success conditions
 
-通常の質問応答に加え、次の振る舞いを成立条件とする。
+Beyond ordinary Q&A, the following must hold:
 
-- 現在と過去の決定を答え分けられる。
-- Agentの推測がユーザーの決定を上書きしない。
-- 同じ出典の重複引用を独立した証拠として扱わない。
-- private memoryが許可なく共有側の検索・要約へ漏れない。
-- 根拠不足なら回答を保留できる。
-- 訂正・削除が検索用索引や要約などの派生データにも反映される。
+- Current and past decisions can be answered separately.
+- Agent speculation does not overwrite a user decision.
+- Duplicate citations of the same source are not independent evidence.
+- Private memory does not leak into shared search or summaries without permission.
+- The system can withhold an answer when evidence is insufficient.
+- Corrections and deletions propagate to derived indexes and summaries.
 
-### 調査上の参照
+### Research references
 
-以下は設計上の参考文献であり、各論文の異なる評価条件から製品間の優劣を確定したものではない。Rookの権限・確定ルールは、複数Agentによる共有知識の管理を目的とする。
+These are design references, not a ranking of products under different evaluation conditions. Rook's authority and confirmation rules exist to manage shared knowledge across agents.
 
-- [MemGPT](https://arxiv.org/abs/2310.08560): コンテキスト内外のメモリ階層管理。
-- [Mem0](https://arxiv.org/abs/2504.19413): 重要情報の抽出・統合・検索。
-- [Zep](https://arxiv.org/html/2501.13956v1): 時間情報、関係の履歴、知識更新。
-- [A-MEM](https://arxiv.org/abs/2502.12110): 動的な関連付けと記憶の整理。
-- [LongMemEval](https://arxiv.org/html/2410.10813v2): 抽出、セッション横断推論、時間推論、更新、回答保留の評価。
+- [MemGPT](https://arxiv.org/abs/2310.08560): memory hierarchy inside and outside context.
+- [Mem0](https://arxiv.org/abs/2504.19413): extraction, consolidation, and retrieval.
+- [Zep](https://arxiv.org/html/2501.13956v1): time, relation history, knowledge updates.
+- [A-MEM](https://arxiv.org/abs/2502.12110): dynamic linking and organization of memory.
+- [LongMemEval](https://arxiv.org/html/2410.10813v2): extraction, cross-session reasoning, temporal reasoning, updates, abstention.
 
-## MemoryからSkill / Documentへ昇格
+## Promoting Memory to Skill / Document
 
-Memoryにすべてを押し込んでブラックボックス化しない。Memory上のepisodeとpatternから、成熟した知識を外へ出す。
+Do not dump everything into Memory and make it a black box. Mature knowledge leaves Memory as Skills or Documents.
 
 ```text
 Sessions / Actions
@@ -203,23 +186,23 @@ Durable explanation / design / research
 Document
 ```
 
-- 繰り返し実行できる手順はSkillへ一般化する。
-- 説明、設計、調査結果、長い知識はDocumentへ整理する。
-- 低成熟度の観測や個別状態はMemory / Episodeに留める。
-- 反復回数だけで直ちにproduction Skillへ昇格せず、候補生成、一般化、検証、承認または設定による自動昇格を経る。
-- 人間が作ったSkillとAgentが学習したSkillは、実行時には同じSkill体系で扱う。
+- Repeatable procedures generalize into Skills.
+- Explanations, designs, research, and long-form knowledge become Documents.
+- Low-maturity observations and one-off state stay in Memory / Episode.
+- Repetition count alone does not promote a production Skill. Candidates go through generalization, validation, and approval or configured auto-promotion.
+- Human-authored and agent-learned Skills use the same Skill system at runtime.
 
-このMemory → Skill / Documentの経路により、蓄積した知識をユーザーが確認・再利用できる形で取り出せる。
+This path lets users inspect and reuse accumulated knowledge.
 
-## SubagentとAgent Networkの分離
+## Subagents vs Agent Network
 
-### DSH Subagent
+### DSH subagent
 
-Main Agentが作業のために呼び出すchild agentはDSH subagentを利用する。researcher、coder、reviewer等の一時的または継続的な配下Agentが対象で、親子関係と同じ作業の制御下にある。
+Child agents a main agent calls for work use DSH subagents. Temporary or long-lived researchers, coders, reviewers, and similar agents stay under the parent and the same job.
 
 ### Agent Network
 
-独立したAgent同士の通信は、DSH subagentとは別のAgent Network Pluginにする。自分の別Agent、他人のAgent、組織のAgent等を対象に、次のような能力を提供する。
+Communication between independent agents is a separate Agent Network plugin, not a DSH subagent. It covers the user's other agents, other people's agents, and organization agents, with capabilities such as:
 
 ```text
 agent.list()
@@ -229,7 +212,7 @@ agent.subscribe(agentId)
 agent.getProfile(agentId)
 ```
 
-Agent Networkとprotocolを同一視しない。内部にはtransport境界を置き、A2Aを主要なtransport候補として利用する。
+Do not equate the Agent Network with a protocol. Keep a transport boundary inside it. A2A is the primary transport candidate.
 
 ```text
 Agent Network
@@ -238,11 +221,11 @@ Agent Network
 └─ HTTP / custom transport
 ```
 
-したがって、**Agent Network ≠ A2A**であり、A2AはAgent Network Pluginのbackend / transportである。
+**Agent Network ≠ A2A.** A2A is a backend / transport for the Agent Network plugin.
 
 ## Knowledge Curator
 
-単一Agent内のreflectionだけに依存せず、複数Agent・Group・Sessionを横断するKnowledge Curatorを置く。
+Do not rely only on reflection inside a single agent. Put a Knowledge Curator across agents, Groups, and Sessions.
 
 ```text
 Coding Agent ─────┐
@@ -252,9 +235,9 @@ Research Agent ──┤
 Personal Agent ──┘
 ```
 
-Curatorは、許可された範囲でAgent、Group、Session、Memory、Documentを読み、Claimの重複整理、関連付け、候補・競合の整理、共有Memoryへの書き込み、Skill候補の提案、Documentの作成を行う。Memoryの確定ルールに従い、Curatorであること自体はScope越境や決定の上書き権限を与えない。
+The Curator reads permitted Agents, Groups, Sessions, Memory, and Documents. It deduplicates Claims, links related items, sorts candidates and conflicts, writes shared Memory, proposes Skill candidates, and drafts Documents. Memory confirmation rules still apply. Being the Curator does not grant extra scope or the right to overwrite decisions.
 
-実装は特殊な隠しpipelineではなく、**通常Agent + system hooks**を基本とする。
+Implement this as a **normal agent plus system hooks**, not a hidden pipeline.
 
 ```text
 session completed
@@ -269,13 +252,13 @@ Knowledge Curator Agent
 shared Memory / Skill proposal / Document
 ```
 
-Knowledge Curatorは通常のAgentとして見えるため、ユーザーが権限や挙動を確認・変更できる。公式presetとして提供する場合も、通常Agentモデルの上に置く。
+The Curator is visible as an ordinary agent, so users can inspect and change its permissions and behavior. Official presets, if any, sit on the same agent model.
 
-## データストア方針
+## Datastore policy
 
-Knowledge / Memoryの正本は**Oxigraph**とする。Entity、Claim、Episodeとその関係・出典をRDFで保存し、SPARQLで探索する。Graph / Ontology中心の方針を維持し、単一のPersistent Computerで始める構成に合わせる。
+The source of truth for Knowledge / Memory is **Oxigraph**. Entities, Claims, Episodes, relations, and provenance are stored as RDF and queried with SPARQL. That matches a graph / ontology approach and a single persistent Computer.
 
-Ontologyは明示的に設計し、初期は小さな語彙とアプリケーション層の型・制約による検証を使う。RDFの採用と推論基盤の導入は分け、OWL reasonerやSHACLは必要性が確認できた場合に検討する。
+Design the ontology explicitly. Start with a small vocabulary and application- layer types and constraints. Adopting RDF is separate from introducing a reasoner. Consider OWL or SHACL only after the need is confirmed.
 
 ```text
 Application Ontology
@@ -283,57 +266,58 @@ Application Ontology
 Oxigraph RDF Graph / SPARQL
 ```
 
-**補助DBは初期の必須構成に含めない。** Sessionやworkflow等は、まずDSHの既存機能・保存先を利用し、独自の永続化を重複実装しない。DSHが提供する永続化と再起動時の復旧範囲は、実装前に確認する。
+**Do not require an auxiliary database in the initial setup.** Prefer DSH's existing session / workflow storage. Confirm what DSH persists and recovers across restarts before adding anything.
 
-| データ                             | 初期の保存先                                            |
-| ---------------------------------- | ------------------------------------------------------- |
-| Entity、Claim、Episode、関係、出典 | Oxigraph                                                |
-| 独自のAgent設定・構成              | 設定ファイル                                            |
-| Skill、Document                    | ファイル                                                |
-| 会話原文、session / workflowの状態 | DSHの既存保存先を優先し、不足する原文はファイル等で保持 |
+| Data | Initial store |
+| --- | --- |
+| Entity, Claim, Episode, relations, provenance | Oxigraph |
+| Rook-specific agent settings | Config files |
+| Skill, Document | Files |
+| Conversation text, session / workflow state | Prefer DSH; keep extra source text in files if needed |
 
-再起動後も確実に処理する通知・Curatorのジョブ管理や重複実行防止など、DSHで不足する永続的な管理状態を自前で持つ必要が生じた場合だけSQLiteを検討する。
+Consider SQLite only when DSH cannot persist notifications, Curator jobs, or dedupe state that must survive restart.
 
-## 初期App・API構成
+## Initial app and API
 
-初期リリースは**Webのみ**とし、Expo Webのフロントエンドを`apps/app`、バックエンドを`apps/api`に置く単一monorepoで始める。将来は同じExpo appからiOS / Androidへ展開する。DesktopはExpo Webの出力をTauriで包む方向とし、初期構築には含めない。
+The first release is **Web only**: Expo Web in `apps/app`, backend in `apps/api`, one monorepo. The same Expo app can later ship to iOS / Android. Desktop can wrap the Expo Web output with Tauri; that is out of the initial build.
 
-| 領域                          | 採用する技術・構成                                       |
-| ----------------------------- | -------------------------------------------------------- |
-| 言語                          | TypeScript                                               |
-| フロントエンド（`apps/app`）  | Expo Web + Expo Router                                   |
-| UI                            | React Native Reusables                                   |
-| データ取得・キャッシュ        | TanStack Query                                           |
-| バックエンド（`apps/api`）    | Bun + Hono + Effect                                      |
-| API・イベント・設定のスキーマ | Effect Schema                                            |
-| Knowledge / Memory            | Oxigraph。補助DBの条件はこの文書のデータストア方針に従う |
-| monorepo・依存管理            | Bun workspaces                                           |
-| appの開発・build              | Expo / Metro                                             |
-| 共通開発ツール                | Vite+                                                    |
+| Area | Choice |
+| --- | --- |
+| Language | TypeScript |
+| Frontend (`apps/app`) | Expo Web + Expo Router |
+| UI | React Native Reusables + Uniwind + Tailwind 4 |
+| Data fetching / cache | TanStack Query |
+| Backend (`apps/api`) | Node + Hono + Effect |
+| Package manager | Bun workspaces |
+| API / event / config schemas | Effect Schema |
+| Knowledge / Memory | Oxigraph. Auxiliary DB follows the datastore policy above |
+| App dev / build | Expo / Metro |
+| Lint / format | Ultracite (Oxlint + Oxfmt) |
+| Workspace tasks / git hooks | Vite+ |
 
-Vite+はlint・format・共通タスク実行等に使い、Expo appの開発・buildはExpo CLI / Metroへ委譲する。React Native ReusablesのUI部品とテーマはまず`apps/app`内に配置する。初期構築ではNativeWind 4とTailwind 3を採用した。実装済みの構成は[Current implementation](#current-implementation)、解決済みの依存バージョンは`bun.lock`を参照する。
+Ultracite formats and lints. Vite+ runs `vp run` workspace tasks and pre-commit hooks. Expo CLI / Metro own app development and builds. React Native Reusables components and theme live in `apps/app` first. Styling follows the Uniwind + Tailwind 4 path from React Native Reusables. See [Current implementation](#current-implementation) and `bun.lock` for resolved versions.
 
 ```text
 rook/
 ├─ apps/
 │  ├─ app/             # Expo Web frontend
-│  └─ api/             # Bun + Hono + Effect backend
+│  └─ api/             # Node + Hono + Effect backend
 ├─ packages/
 │  ├─ contracts/       # API / event schemas and types
-│  └─ dsh-adapter/     # DSH integration
+│  └─ dsh-adapter/      # DSH integration
 ├─ presets/
 └─ docs/
    ├─ product.md
    └─ architecture.md
 ```
 
-HonoがHTTPの入口とレスポンス・イベント配信を担当し、EffectがRook側の依存関係、失敗、リソース、購読・バックグラウンド処理の寿命を管理する。DSHが所有するAgent loop、session、subagent、workflowの実行はDSHに委ねる。UIを閉じてもAgentが動き続けるよう、クライアントと常駐serverの寿命を分離する。
+Hono is the HTTP entrypoint and response / event delivery. Effect owns Rook-side dependencies, failures, resources, and the lifetime of subscriptions and background work. Agent loops, sessions, subagents, and workflows stay in DSH. Keep the client lifetime separate from the always-on server so closing the UI does not stop agents.
 
-初期通信はHTTP + SSEを基本案とする。モバイル展開時のストリーミング接続・再接続、DesktopのOS連携やローカルserver同梱方法は、その対応時に検証する。
+Initial transport is HTTP + SSE. Streaming reconnect on mobile, and how desktop talks to a bundled local server, are verified when those surfaces are built.
 
-DSH接続方式とBun上での互換性は実装時に検証する。
+Verify DSH's connection API and Node compatibility at implementation time.
 
-## 最小構成
+## Minimal composition
 
 ```text
 Rook
@@ -352,20 +336,20 @@ Rook
 └─ Gateway / UX / notifications
 ```
 
-初期に作らないものは、独自Agent loop、独自tool framework、独自Skill engine、独自subagent runtime、独自workflow engine、独自sandbox runtime、独自MCP implementation、巨大なcontrol planeである。
+Do not build a custom agent loop, tool framework, Skill engine, subagent runtime, workflow engine, sandbox runtime, MCP implementation, or large control plane.
 
-## 未決事項
+## Open questions
 
-- DSHのAgent Plugins v1 APIとadapterの詳細
-- DSHのsession / workflow等の永続化・再起動時の復旧範囲と、独自管理状態の必要性
-- Oxigraphの代表クエリ（Scope内検索、出典追跡、矛盾・失効したClaimの除外）の実データでの性能
-- Persistent Computerの初期providerと、ローカルPC・VM・containerの優先順位
-- Sandbox providerと、persistent filesystemやcredentialを越境させない境界
-- Groupの権限継承、Memory確定ルールに基づく具体的な競合解決操作とCuratorの承認フロー
-- Claim / Entity / Episodeの役割に基づく初期Ontologyと厳密な型
-- Agent Networkのidentity、認証、認可、公開範囲、A2A profile
-- MemoryからSkill / Documentへ昇格する評価基準と自動化範囲
-- raw episodeの保持場所、保存期間、削除範囲、provenance pointerの形式
-- Memoryの権限判定表、競合解決・承認画面、索引方式、検索予算、評価の実装
-- Web以外のGateway channelの追加時期とproactive notificationの範囲
-- DSHとのBun互換性
+- DSH Agent Plugins v1 API and adapter details
+- How much of DSH session / workflow state survives restart, and whether Rook needs its own management state
+- Performance of representative Oxigraph queries (in-scope search, provenance, excluding contradicted or expired Claims) on real data
+- Initial Persistent Computer provider, and priority among local PC, VM, and container
+- Sandbox provider, and the boundary that keeps persistent files and credentials in
+- Group permission inheritance, concrete conflict resolution for Memory confirmation, and the Curator approval flow
+- Initial ontology and strict types for Claim / Entity / Episode
+- Agent Network identity, authn, authz, visibility, and A2A profile
+- Evaluation criteria and automation for promoting Memory to Skill / Document
+- Where raw episodes live, retention, deletion, and provenance pointer format
+- Memory permission matrix, conflict / approval UI, index strategy, search budget, and evaluation
+- When to add Gateway channels besides Web, and the scope of proactive notifications
+- DSH compatibility on Node

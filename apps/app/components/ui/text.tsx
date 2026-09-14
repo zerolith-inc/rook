@@ -1,15 +1,18 @@
-import { cn } from "@/lib/utils";
 import { Slot } from "@rn-primitives/slot";
-import { cva, type VariantProps } from "class-variance-authority";
+import { cva } from "class-variance-authority";
+import type { VariantProps } from "class-variance-authority";
 import * as React from "react";
-import { Platform, Text as RNText, type Role } from "react-native";
+import { Platform, Text as RNText } from "react-native";
+import type { Role } from "react-native";
+
+import { cn } from "@/lib/utils";
 
 const textVariants = cva(
   cn(
     "text-foreground text-base",
     Platform.select({
       web: "select-text",
-    }),
+    })
   ),
   {
     variants: {
@@ -17,29 +20,35 @@ const textVariants = cva(
         default: "",
         h1: cn(
           "text-center text-4xl font-extrabold tracking-tight",
-          Platform.select({ web: "scroll-m-20 text-balance" }),
+          Platform.select({ web: "scroll-m-20 text-balance" })
         ),
         h2: cn(
           "border-border border-b pb-2 text-3xl font-semibold tracking-tight",
-          Platform.select({ web: "scroll-m-20 first:mt-0" }),
+          Platform.select({ web: "scroll-m-20 first:mt-0" })
         ),
-        h3: cn("text-2xl font-semibold tracking-tight", Platform.select({ web: "scroll-m-20" })),
-        h4: cn("text-xl font-semibold tracking-tight", Platform.select({ web: "scroll-m-20" })),
+        h3: cn(
+          "text-2xl font-semibold tracking-tight",
+          Platform.select({ web: "scroll-m-20" })
+        ),
+        h4: cn(
+          "text-xl font-semibold tracking-tight",
+          Platform.select({ web: "scroll-m-20" })
+        ),
         p: "mt-3 leading-7 sm:mt-6",
         blockquote: "mt-4 border-l-2 pl-3 italic sm:mt-6 sm:pl-6",
         code: cn(
-          "bg-muted relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold",
+          "bg-muted relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold"
         ),
         lead: "text-muted-foreground text-xl",
         large: "text-lg font-semibold",
-        small: "text-sm font-medium leading-none",
+        small: "text-sm leading-none font-medium",
         muted: "text-muted-foreground text-sm",
       },
     },
     defaultVariants: {
       variant: "default",
     },
-  },
+  }
 );
 
 type TextVariantProps = VariantProps<typeof textVariants>;
@@ -64,7 +73,7 @@ const ARIA_LEVEL: Partial<Record<TextVariant, string>> = {
 
 const TextClassContext = React.createContext<string | undefined>(undefined);
 
-function Text({
+const Text = ({
   className,
   asChild = false,
   variant = "default",
@@ -73,7 +82,7 @@ function Text({
   React.RefAttributes<typeof RNText> &
   TextVariantProps & {
     asChild?: boolean;
-  }) {
+  }) => {
   const textClass = React.useContext(TextClassContext);
   const Component = asChild ? Slot : RNText;
   return (
@@ -84,6 +93,6 @@ function Text({
       {...props}
     />
   );
-}
+};
 
 export { Text, TextClassContext };
